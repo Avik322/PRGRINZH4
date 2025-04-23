@@ -1,0 +1,7 @@
+.vs/
+wait-for-it
+__pycache__/
+*.pyc
+*.log
+*.db
+.env

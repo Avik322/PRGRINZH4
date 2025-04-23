@@ -29,7 +29,18 @@ services:
     ports:
       - "8082:8082"
     depends_on:
-      - db
+      - mongo
+
+  message_service:
+    build:
+      context: ./message_service
+      dockerfile: Dockerfile
+    depends_on:
+      - mongo
+    ports:
+      - "8083:8083"
+    environment:
+      MONGO_URI: mongodb://mongo:27017
 
   db:
     image: postgres:14
@@ -43,5 +54,13 @@ services:
     ports:
       - "5432:5432"
 
+  mongo:
+    image: mongo:5.0
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodata:/data/db
+
 volumes:
   pgdata:
+  mongodata:
