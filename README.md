@@ -1,5 +1,5 @@
 ## Лабораторная работа №5. Redis.
-
+ОШИБСЯ С КОМИТАМИ ЧУТЬ-ЧУТЬ :)
 ```bash
 docker exec -it prgrinzh-main-redis-1 redis-cli
 127.0.0.1:6379> GET sender:user1
