@@ -1,22 +1,40 @@
-# Лабораторная работа №4
+# Лабораторная работа № 6  
+**CQRS + Kafka + Redis + MongoDB**
 
-## Описание
+## Кратко
+Добавлен событийный контур для сообщений:
 
-Реализован отдельный микросервис `message_service`, использующий MongoDB (v5.0) для хранения сообщений. Он не связан с клиентскими данными и запускается в составе общей системы с помощью `docker-compose`.
+POST → message_service → Kafka → message_consumer → MongoDB
+↑
+└── Redis-cache
 
-## Состав
+markdown
+Копировать
+Редактировать
 
-- `message_service/` — FastAPI-сервис для работы с сообщениями.
-- `message_service/database.py` — подключение к MongoDB.
-- `message_service/init_db.py` — инициализация коллекции и индексов.
-- `message_service/main.py` — endpoints для CRUD-операций с сообщениями.
-- `message_service/models.py` — модель `Message` с sender, receiver, content.
-- `message_service/requirements.txt` — зависимости сервиса.
-- `docker-compose.yaml` — содержит описание всех сервисов, включая MongoDB.
-- `.gitignore` — исключает `.vs/`, `wait-for-it.sh` и другие не нужные файлы.
-- `message.json` — пример данных, полученных из GET-запроса.
+* **Командная модель** (`message_service`, порт 8083) публикует событие `messages` в Kafka и сбрасывает кэш.  
+* **Читательская модель** (`message_consumer`) читает события, пишет их в MongoDB, инвалидирует Redis.
 
-## Как запускать
+## Запуск
 
 ```bash
-docker-compose up --build
+git clone https://github.com/Avik322/PRGRINZH4.git
+cd PRGRINZH4/prgrinzh-main
+docker compose up --build -d
+Сервис	Порт
+Message API	8083
+Kafka (external)	9093
+Redis	6379
+MongoDB	27017
+
+Быстрый тест
+bash
+Копировать
+Редактировать
+# создать сообщение
+curl -X POST http://localhost:8083/messages \
+     -H "Content-Type: application/json" \
+     -d '{"sender":"alice","receiver":"bob","text":"hello"}'
+
+# получить по получателю (первый раз из Mongo, затем из Redis)
+curl http://localhost:8083/messages/receiver/bob
