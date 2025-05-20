@@ -1,6 +1,51 @@
-version: '3.9'
+version: "3.9"
 
 services:
+  zookeeper:
+    image: bitnami/zookeeper:3.9
+    environment:
+      - ALLOW_ANONYMOUS_LOGIN=yes
+    ports:
+      - "2181:2181"
+
+  kafka:
+    image: bitnami/kafka:3.7
+    depends_on:
+      - zookeeper
+    environment:
+      - KAFKA_CFG_ZOOKEEPER_CONNECT=zookeeper:2181
+      - KAFKA_CFG_LISTENERS=INTERNAL://:9092,EXTERNAL://:9093
+      - KAFKA_CFG_ADVERTISED_LISTENERS=INTERNAL://kafka:9092,EXTERNAL://localhost:9093
+      - KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP=INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT
+      - KAFKA_INTER_BROKER_LISTENER_NAME=INTERNAL
+      - ALLOW_PLAINTEXT_LISTENER=yes
+    ports:
+      - "9093:9093"
+
+  redis:
+    image: redis:7.0
+    ports:
+      - "6379:6379"
+
+  mongo:
+    image: mongo:5.0
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodata:/data/db
+
+  db:
+    image: postgres:14
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: parcels
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
   user_service:
     build:
       context: ./prgrinzh-main
@@ -14,13 +59,39 @@ services:
     build:
       context: ./parcel_service
       dockerfile: Dockerfile
-    ports:
-      - "8081:8081"
+    command: ["./wait-for-it.sh","db:5432","--","uvicorn","main:app","--host","0.0.0.0","--port","8081"]
     depends_on:
       - db
+    ports:
+      - "8081:8081"
+
+  message_service:
+    build:
+      context: ./message_service
+      dockerfile: Dockerfile
     environment:
-      DATABASE_URL: postgresql://postgres:postgres@db:5432/parcels
-    command: ["./wait-for-it.sh", "db:5432", "--", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8081"]
+      MONGO_URI: mongodb://mongo:27017
+      REDIS_HOST: redis
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+    depends_on:
+      - kafka
+      - redis
+      - mongo
+    ports:
+      - "8083:8083"
+
+  message_consumer:
+    build:
+      context: ./message_consumer
+    environment:
+      MONGO_URI: mongodb://mongo:27017
+      REDIS_HOST: redis
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      KAFKA_GROUP_ID: msg-consumer
+    depends_on:
+      - kafka
+      - redis
+      - mongo
 
   delivery_service:
     build:
@@ -30,44 +101,6 @@ services:
       - "8082:8082"
     depends_on:
       - mongo
-
-  message_service:
-    build:
-      context: ./message_service
-      dockerfile: Dockerfile
-    depends_on:
-      - mongo
-      - redis
-    ports:
-      - "8083:8083"
-    environment:
-      MONGO_URI: mongodb://mongo:27017
-      REDIS_HOST: redis
-
-
-  db:
-    image: postgres:14
-    restart: always
-    environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: parcels
-    volumes:
-      - pgdata:/var/lib/postgresql/data
-    ports:
-      - "5432:5432"
-
-  mongo:
-    image: mongo:5.0
-    ports:
-      - "27017:27017"
-    volumes:
-      - mongodata:/data/db
-
-  redis:
-    image: redis:7.0
-    ports:
-    - "6379:6379"
 
 volumes:
   pgdata:
